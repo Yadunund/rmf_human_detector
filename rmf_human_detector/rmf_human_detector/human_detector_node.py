@@ -48,6 +48,8 @@ class HumanDetector(Node):
           _msg.id = id
           id = id = 1
           _msg.source = "human_detector"
+          _msg.level_name = self.level_name
+          _msg.classification = "human"
           # todo(YV): Apply transformation based on camera_pose
           # ObstacleData
           _msg.data.box.center.position.x = detection.depth_x
