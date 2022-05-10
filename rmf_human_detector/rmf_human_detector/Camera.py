@@ -32,7 +32,7 @@ class Camera:
     def start(self):
         print("Starting to detect humans...")
         self.quit = False
-    
+
     def stop(self):
         self.quit = True
 
@@ -87,13 +87,13 @@ class Camera:
         stereo.initialConfig.setConfidenceThreshold(255)
         stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
         # Align depth map to the perspective of RGB camera, on which inference is done
-        stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
+        # stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
         stereo.setOutputSize(monoLeft.getResolutionWidth(), monoLeft.getResolutionHeight())
 
         spatialDetectionNetwork.setBlobPath(nnBlobPath)
         spatialDetectionNetwork.setConfidenceThreshold(0.5)
         spatialDetectionNetwork.input.setBlocking(False)
-        spatialDetectionNetwork.setBoundingBoxScaleFactor(1.0)
+        spatialDetectionNetwork.setBoundingBoxScaleFactor(0.9)
         spatialDetectionNetwork.setDepthLowerThreshold(100)
         spatialDetectionNetwork.setDepthUpperThreshold(5000)
 
@@ -139,12 +139,10 @@ class Camera:
 
                 detections = inDet.detections
                 roiDatas = xoutBoundingBoxDepthMapping.get().getConfigData()
-                print(f"num detections : {len(detections)} num rois : {len(roiDatas)}")
                 # todo track objects and update on when there is significant change in position
                 self.detections = []
 
                 if (len(detections) != len(roiDatas)):
-                    print("oops")
                     continue
                 for i in range(len(detections)):
                     detection = detections[i]
@@ -187,20 +185,14 @@ class Camera:
                     if label != "person":
                         continue
 
-                    # topLeft = roi.topLeft()
-                    # bottomRight = roi.bottomRight()
-                    # xmin = int(topLeft.x)
-                    # ymin = int(topLeft.y)
-                    # xmax = int(bottomRight.x)
-                    # ymax = int(bottomRight.y)
+                    # todo(YV): Get the correct width and height
                     width = roi.size().width / 1000.0
                     height = roi.size().height / 1000.0
                     depth_x = detection.spatialCoordinates.x / 1000.0
                     depth_y = detection.spatialCoordinates.y / 1000.0
                     depth_z = detection.spatialCoordinates.z / 1000.0
                     self.detections.append(Detection(depth_x,depth_y,depth_z,width,height))
-                    print(f"Detected person of height {height : .2f} and width {width : .2f}")
-
+                    # print(f"Detected person of height {height : .2f} and width {width : .2f}")
 
                 if cv2.waitKey(1) == ord('q'):
                     break

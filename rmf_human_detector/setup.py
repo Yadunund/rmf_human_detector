@@ -20,6 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'human_detector_node=rmf_human_detector.human_detector_node:main'
         ],
     },
 )
