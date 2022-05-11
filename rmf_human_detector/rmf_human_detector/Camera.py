@@ -26,6 +26,7 @@ class Camera:
         self.detections = [] # store detected persons as Detection objects
         self.pipeline = self._create_pipeline()
         self.quit = True
+        self._lock = threading.Lock()
         self.thread = threading.Thread(target=self._run)
         self.thread.start()
 
@@ -40,6 +41,10 @@ class Camera:
         self.stop()
         del self.pipeline
         self.thread = None
+
+    def get_detections(self):
+        with self._lock:
+            return self.detections
 
     def _create_pipeline(self):
 
@@ -74,28 +79,30 @@ class Camera:
 
         # Set properties
         camRgb.setPreviewSize(300, 300)
+        # camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_4_K)
         camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
         camRgb.setInterleaved(False)
         camRgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
 
-        monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+        monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
         monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
-        monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+        monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
         monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
 
         # Setting node configs
         stereo.initialConfig.setConfidenceThreshold(255)
         stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
         # Align depth map to the perspective of RGB camera, on which inference is done
-        # stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
+        stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
         stereo.setOutputSize(monoLeft.getResolutionWidth(), monoLeft.getResolutionHeight())
 
         spatialDetectionNetwork.setBlobPath(nnBlobPath)
         spatialDetectionNetwork.setConfidenceThreshold(0.5)
         spatialDetectionNetwork.input.setBlocking(False)
-        spatialDetectionNetwork.setBoundingBoxScaleFactor(0.9)
+        spatialDetectionNetwork.setBoundingBoxScaleFactor(0.7)
         spatialDetectionNetwork.setDepthLowerThreshold(100)
         spatialDetectionNetwork.setDepthUpperThreshold(5000)
+        spatialDetectionNetwork.setNumInferenceThreads(2)
 
         # Link nodes
         monoLeft.out.link(stereo.left)
@@ -139,23 +146,32 @@ class Camera:
 
                 detections = inDet.detections
                 roiDatas = xoutBoundingBoxDepthMapping.get().getConfigData()
-                # todo track objects and update on when there is significant change in position
-                self.detections = []
 
-                if (len(detections) != len(roiDatas)):
+                num_detections = len(detections)
+                num_rois = len(roiDatas)
+                # print(f"num_detections: {num_detections} num_rois: {num_rois}")
+                if (num_detections != num_rois):
+                    # print(f"    num_detections and num_rois do not match. Skipping")
                     continue
+                # todo track objects and update on when there is significant change in position
+
+                if (self.visualize):
+                    frame = previewQueue.get().getCvFrame()
+                    depthFrameColor = cv2.normalize(depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
+                    depthFrameColor = cv2.equalizeHist(depthFrameColor)
+                    depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
+
+                new_detections = []
                 for i in range(len(detections)):
                     detection = detections[i]
                     roi = roiDatas[i].roi.denormalize(depthFrame.shape[1], depthFrame.shape[0])
                     if detection.label >= len(self.labelMap):
+                        # print(f"Detected unknown label: {detection.label}")
                         continue
                     label = self.labelMap[detection.label]
+                    # print(f"Detected {label}")
 
                     if (self.visualize):
-                        frame = previewQueue.get().getCvFrame()
-                        depthFrameColor = cv2.normalize(depthFrame, None, 255, 0, cv2.NORM_INF, cv2.CV_8UC1)
-                        depthFrameColor = cv2.equalizeHist(depthFrameColor)
-                        depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
                         topLeft = roi.topLeft()
                         bottomRight = roi.bottomRight()
                         xmin = int(topLeft.x)
@@ -179,10 +195,8 @@ class Camera:
 
                         cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), cv2.FONT_HERSHEY_SIMPLEX)
 
-                        cv2.imshow("depth", depthFrameColor)
-                        cv2.imshow("preview", frame)
-
                     if label != "person":
+                        # print(f"    Not adding detection {label} to detections list")
                         continue
 
                     # todo(YV): Get the correct width and height
@@ -191,8 +205,15 @@ class Camera:
                     depth_x = detection.spatialCoordinates.x / 1000.0
                     depth_y = detection.spatialCoordinates.y / 1000.0
                     depth_z = detection.spatialCoordinates.z / 1000.0
-                    self.detections.append(Detection(depth_x,depth_y,depth_z,width,height))
+                    new_detections.append(Detection(depth_x,depth_y,depth_z,0.6,1.8))
                     # print(f"Detected person of height {height : .2f} and width {width : .2f}")
+                
+                with self._lock:
+                    self.detections = new_detections
+
+                if (self.visualize):
+                    cv2.imshow("depth", depthFrameColor)
+                    cv2.imshow("preview", frame)
 
                 if cv2.waitKey(1) == ord('q'):
                     break

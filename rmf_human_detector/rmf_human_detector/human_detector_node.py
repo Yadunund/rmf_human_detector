@@ -27,7 +27,7 @@ class HumanDetector(Node):
           self.camera_pose = self.get_parameter('camera_pose').value
 
       self.timer = self.create_timer(
-        1.0,
+        0.1,
         self._timer_cb)
 
       self.pub = self.create_publisher(
@@ -40,7 +40,8 @@ class HumanDetector(Node):
   def _timer_cb(self):
       msg = Obstacles()
       id = 0
-      for detection in self.camera.detections:
+    #   print(f"Timer cb obstacles count {len(self.camera.detections)}")
+      for detection in self.camera.get_detections():
           _msg = Obstacle()
           _msg.header.frame_id = self.frame_id
           _msg.header.stamp = self.get_clock().now().to_msg()
@@ -64,6 +65,7 @@ class HumanDetector(Node):
           _msg.action = _msg.ACTION_ADD
           msg.obstacles.append(_msg)
       if len(msg.obstacles) > 0:
+          self.get_logger().info(f"Detected and publishing {len(msg.obstacles)} humans as obstacles")
           self.pub.publish(msg)
 
 def main(argv=sys.argv):
