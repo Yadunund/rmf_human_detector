@@ -53,12 +53,12 @@ class HumanDetector(Node):
           _msg.classification = "human"
           # todo(YV): Apply transformation based on camera_pose
           # ObstacleData
-          _msg.data.box.center.position.x = detection.depth_x
-          _msg.data.box.center.position.y = detection.depth_z
-          _msg.data.box.center.position.z = detection.depth_y
-          _msg.data.box.size.x = detection.width
-          _msg.data.box.size.y = detection.width
-          _msg.data.box.size.z = detection.height
+          _msg.bbox.center.position.x = detection.depth_x
+          _msg.bbox.center.position.y = detection.depth_z
+          _msg.bbox.center.position.z = detection.depth_y
+          _msg.bbox.size.x = detection.width
+          _msg.bbox.size.y = detection.width
+          _msg.bbox.size.z = detection.height
 
           _msg.lifetime.sec = 1
           _msg.lifetime.nanosec  = 0
