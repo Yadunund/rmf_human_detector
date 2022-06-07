@@ -10,7 +10,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_system_default
 
-from rmf_obstacle_msgs.msg import Obstacles, Obstacle, ObstacleData
+from rmf_obstacle_msgs.msg import Obstacles, Obstacle
 
 class HumanDetector(Node):
   def __init__(self,visualize=False):
