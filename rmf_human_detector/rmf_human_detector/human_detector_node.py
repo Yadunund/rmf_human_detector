@@ -47,7 +47,7 @@ class HumanDetector(Node):
           _msg.header.stamp = self.get_clock().now().to_msg()
           # todo
           _msg.id = id
-          id = id = 1
+          id = id + 1
           _msg.source = "human_detector"
           _msg.level_name = self.level_name
           _msg.classification = "human"
